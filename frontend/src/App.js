@@ -14,13 +14,11 @@ function App() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const accessToken = params.get("access_token");
-    const refreshToken = params.get("refresh_token");
 
-    if (accessToken && refreshToken) {
-      localStorage.setItem("access_token", accessToken);
-      localStorage.setItem("refresh_token", refreshToken);
-      window.history.replaceState({}, document.title, "/");
-    }
+	if (accessToken) {
+		localStorage.setItem("access_token", accessToken);
+		window.history.replaceState({}, document.title, "/");
+	}
   }, []);
 
   const generatePlaylist = async () => {
@@ -33,7 +31,6 @@ function App() {
           prompt,
           playlistName,
           access_token: localStorage.getItem("access_token"),
-          refresh_token: localStorage.getItem("refresh_token"),
         },
         { withCredentials: true }
       );
@@ -41,7 +38,7 @@ function App() {
       setResult(response.data);
     } catch (error) {
       console.error(error);
-      alert("Errore generazione playlist. Fai prima login su Spotify.");
+      alert("Errore generazione playlist. Fai prima login su Google.");
     }
 
     setLoading(false);
@@ -52,9 +49,9 @@ function App() {
       <h1>🎵 AI Playlist Generator</h1>
 
       <p>
-        Prima fai login su Spotify:{" "}
+        Prima fai login su Google:{" "}
         <a href={`${BACKEND_URL}/login`}>
-          Login Spotify
+          Login YouTube
         </a>
       </p>
 
@@ -82,7 +79,7 @@ function App() {
         <div style={{ marginTop: "20px" }}>
           <h2>Playlist creata! 🎉</h2>
           <a href={result.playlistUrl} target="_blank" rel="noreferrer">
-            Apri su Spotify
+            Apri su YouTube
           </a>
 
           <ul>
