@@ -3,16 +3,27 @@ import dotenv from "dotenv";
 import axios from "axios";
 import OpenAI from "openai";
 import cors from "cors";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
 const app = express();
-app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
+
+app.use(cors({
+  origin: process.env.FRONTEND_URL,
+  credentials: true
+}));
 app.use(express.json());
 
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
+  
+/* ===== Supabase (solo backend!) ===== */
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);  
   
   async function extractTags(prompt) {
   // 🔵 1️⃣ Prova OpenAI
@@ -131,9 +142,9 @@ app.get("/callback", async (req, res) => {
 ========================= */
 app.post("/generate-playlist", async (req, res) => {
   try {
-    const { prompt, playlistName, access_token } = req.body;
+    const { prompt, playlistName, access_token, userEmail } = req.body;
 
-    if (!prompt || !playlistName || !access_token) {
+    if (!prompt || !playlistName || !access_token)
       return res.status(400).json({ error: "Dati mancanti" });
     }
 
@@ -184,6 +195,17 @@ app.post("/generate-playlist", async (req, res) => {
     );
 
     const playlistId = playlistRes.data.id;
+	
+	const playlistUrl = `https://www.youtube.com/playlist?list=${playlistId}`;
+
+	/* 💾 Salva su Supabase */
+	await supabase.from("playlists").insert([
+	  {
+		user_email: userEmail || "anonimo",
+		name: playlistName,
+		youtube_url: playlistUrl
+	  }
+	]);
 
     /* 4️⃣ Cerca ogni brano su YouTube e aggiungilo */
     for (const track of tracks) {
@@ -228,7 +250,7 @@ app.post("/generate-playlist", async (req, res) => {
 
     /* 5️⃣ Risposta finale */
     res.json({
-      playlistUrl: `https://www.youtube.com/playlist?list=${playlistId}`,
+	  playlistUrl,
       tags,
       tracks: tracks.map(t => ({
         name: t.name,
