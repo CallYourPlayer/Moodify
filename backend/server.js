@@ -144,7 +144,7 @@ app.post("/generate-playlist", async (req, res) => {
   try {
     const { prompt, playlistName, access_token, userEmail } = req.body;
 
-    if (!prompt || !playlistName || !access_token)
+    if (!prompt || !playlistName || !access_token) {
       return res.status(400).json({ error: "Dati mancanti" });
     }
 
