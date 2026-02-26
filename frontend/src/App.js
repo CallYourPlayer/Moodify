@@ -1,27 +1,80 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.REACT_APP_SUPABASE_URL,
+  process.env.REACT_APP_SUPABASE_ANON_KEY
+);
 
 function App() {
   const [prompt, setPrompt] = useState("");
   const [playlistName, setPlaylistName] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [session, setSession] = useState(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  // 🔹 Backend URL dinamico
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:3000";
+  const BACKEND_URL =
+    process.env.REACT_APP_BACKEND_URL || "http://localhost:3000";
 
-  // 🔹 Salva token dopo redirect login
+  /* =========================
+     SUPABASE SESSION
+  ========================= */
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const accessToken = params.get("access_token");
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+    });
 
-	if (accessToken) {
-		localStorage.setItem("access_token", accessToken);
-		window.history.replaceState({}, document.title, "/");
-	}
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
+  /* =========================
+     LOGIN EMAIL/PASSWORD
+  ========================= */
+  const login = async () => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) alert(error.message);
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setResult(null);
+  };
+
+  /* =========================
+     SALVA TOKEN YOUTUBE
+  ========================= */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ytToken = params.get("access_token");
+
+    if (ytToken) {
+      localStorage.setItem("yt_token", ytToken);
+      window.history.replaceState({}, document.title, "/");
+    }
+  }, []);
+
+  /* =========================
+     GENERA PLAYLIST
+  ========================= */
   const generatePlaylist = async () => {
+    if (!session) {
+      alert("Devi fare login prima.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -30,15 +83,19 @@ function App() {
         {
           prompt,
           playlistName,
-          access_token: localStorage.getItem("access_token"),
+          access_token: localStorage.getItem("yt_token"),
         },
-        { withCredentials: true }
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
       );
 
       setResult(response.data);
     } catch (error) {
       console.error(error);
-      alert("Errore generazione playlist. Fai prima login su Google.");
+      alert("Errore generazione playlist.");
     }
 
     setLoading(false);
@@ -48,12 +105,41 @@ function App() {
     <div style={{ padding: "2rem", fontFamily: "Arial" }}>
       <h1>🎵 AI Playlist Generator</h1>
 
+      {/* ===== LOGIN SUPABASE ===== */}
+      {!session ? (
+        <div>
+          <h3>Login</h3>
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <br />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <br />
+          <button onClick={login}>Login</button>
+        </div>
+      ) : (
+        <div>
+          <p>Loggato come: {session.user.email}</p>
+          <button onClick={logout}>Logout</button>
+        </div>
+      )}
+
+      <hr />
+
       <p>
-        Prima fai login su Google:{" "}
-        <a href={`${BACKEND_URL}/login`}>
-          Login YouTube
-        </a>
+        1️⃣ Fai login su YouTube:{" "}
+        <a href={`${BACKEND_URL}/login`}>Login YouTube</a>
       </p>
+
+      <p>2️⃣ Genera playlist</p>
 
       <input
         type="text"
